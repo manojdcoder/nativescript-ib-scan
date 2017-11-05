@@ -4,8 +4,6 @@ import * as application from "tns-core-modules/application";
 
 import { Common } from "./ib-scan.common";
 
-export import IBScanListener = com.integratedbiometrics.ibscanultimate.IBScanListener;
-export import IBScanDeviceListener = com.integratedbiometrics.ibscanultimate.IBScanDeviceListener;
 export import IBScan = com.integratedbiometrics.ibscanultimate.IBScan;
 export import IBScanDevice = com.integratedbiometrics.ibscanultimate.IBScanDevice;
 export import IBScanException = com.integratedbiometrics.ibscanultimate.IBScanException;
@@ -16,8 +14,13 @@ export import ImageType = IBScanDevice.ImageType;
 export import PlatenState = IBScanDevice.PlatenState;
 export import SegmentPosition = IBScanDevice.SegmentPosition;
 
-@Interfaces([IBScanListener, IBScanDeviceListener])
-export class IbScan extends Common implements IBScanListener, IBScanDeviceListener {
+@Interfaces([
+    com.integratedbiometrics.ibscanultimate.IBScanListener,
+    com.integratedbiometrics.ibscanultimate.IBScanDeviceListener
+])
+export class IbScan extends java.lang.Object implements
+    com.integratedbiometrics.ibscanultimate.IBScanListener,
+    com.integratedbiometrics.ibscanultimate.IBScanDeviceListener {
 
     private ibScan: IBScan;
 
@@ -86,7 +89,8 @@ export class IbScan extends Common implements IBScanListener, IBScanDeviceListen
         let me = this;
 
         me.ibScan = IBScan.getInstance(application.android.context);
-        me.ibScan.setScanListener(me);
+        me.ibScan.setScanListener(global.__native(me));
+        return global.__native(me);
     }
 
     scanDeviceAttached(deviceId: number) {

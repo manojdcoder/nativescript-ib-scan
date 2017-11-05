@@ -9,6 +9,7 @@ export class HelloWorldModel extends Observable {
     super();
     let me = this;
 
+    me.message = "Started!!!";
     me.ibScan = new IbScan(
       (deviceId: number) => {
         me.message = `Device ${deviceId} attached`;
