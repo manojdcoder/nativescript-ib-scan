@@ -1,0 +1,13 @@
+/* Include.gradle configuration: http://docs.nativescript.org/plugins/plugins#includegradle-specification */
+
+android {
+	productFlavors {
+		"nativescript-ib-scan" {
+			dimension "nativescript-ib-scan"
+		}
+	}
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: '*.jar')
+}
