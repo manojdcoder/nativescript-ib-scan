@@ -1,8 +1,16 @@
 import * as _ from "lodash";
 
 import * as application from "tns-core-modules/application";
+import * as imageSource from "tns-core-modules/image-source";
 
 import { Common } from "./ib-scan.common";
+
+import Integer = java.lang.Integer;
+import Runnable = java.lang.Runnable;
+import ByteBuffer = java.nio.ByteBuffer;
+import Context = android.content.Context;
+import UsbDevice = android.hardware.usb.UsbDevice;
+import Bitmap = android.graphics.Bitmap;
 
 export import IBScan = com.integratedbiometrics.ibscanultimate.IBScan;
 export import IBScanDevice = com.integratedbiometrics.ibscanultimate.IBScanDevice;
@@ -11,8 +19,15 @@ export import FingerCountState = IBScanDevice.FingerCountState;
 export import FingerQualityState = IBScanDevice.FingerQualityState;
 export import ImageData = IBScanDevice.ImageData;
 export import ImageType = IBScanDevice.ImageType;
+export import ImageFormat = IBScanDevice.ImageFormat;
+export import ImageResolution = IBScanDevice.ImageResolution;
 export import PlatenState = IBScanDevice.PlatenState;
 export import SegmentPosition = IBScanDevice.SegmentPosition;
+
+export interface ConnectedDevice {
+    deviceId: number;
+    hasPermission: boolean;
+}
 
 @Interfaces([
     com.integratedbiometrics.ibscanultimate.IBScanListener,
@@ -23,6 +38,8 @@ export class IbScan extends java.lang.Object implements
     com.integratedbiometrics.ibscanultimate.IBScanDeviceListener {
 
     private ibScan: IBScan;
+    private ibScanDevice: IBScanDevice;
+    private bitmapImage: Bitmap;
 
     constructor(
         public scanDeviceAttachedCallback?: (deviceId: number) => void,
@@ -46,7 +63,7 @@ export class IbScan extends java.lang.Object implements
         ) => void,
         public deviceFingerQualityChangedCallback?: (
             device: IBScanDevice,
-            fingerQualities: FingerQualityState[]
+            fingerQualities: Array<FingerQualityState>
         ) => void,
         public deviceAcquisitionBegunCallback?: (
             device: IBScanDevice,
@@ -60,7 +77,7 @@ export class IbScan extends java.lang.Object implements
             device: IBScanDevice,
             image: ImageData,
             imageType: ImageType,
-            splitImageArray: ImageData[]
+            splitImageArray: Array<ImageData>
         ) => void,
         public deviceImageResultExtendedAvailableCallback?: (
             device: IBScanDevice,
@@ -68,8 +85,8 @@ export class IbScan extends java.lang.Object implements
             image: ImageData,
             imageType: ImageType,
             detectedFingerCount: number,
-            segmentImageArray: ImageData[],
-            segmentPositionArray: SegmentPosition[]
+            segmentImageArray: Array<ImageData>,
+            segmentPositionArray: Array<SegmentPosition>
         ) => void,
         public devicePlatenStateChangedCallback?: (
             device: IBScanDevice,
@@ -85,19 +102,233 @@ export class IbScan extends java.lang.Object implements
         ) => void
     ) {
         super();
+        return global.__native(this);
+    }
 
+    getInstance(): IBScan {
         let me = this;
 
+        if (me.ibScan) {
+            return me.ibScan;
+        }
+
         me.ibScan = IBScan.getInstance(application.android.context);
-        me.ibScan.setScanListener(global.__native(me));
-        return global.__native(me);
+        me.ibScan.setScanListener(me);
+        return me.ibScan;
+    }
+
+    getDeviceList(): Array<ConnectedDevice> {
+        let me = this,
+            deviceList: Array<ConnectedDevice> = new Array(),
+            usbManager = (<Context>application.android.context).getSystemService(Context.USB_SERVICE),
+            usbDeviceList = usbManager.getDeviceList(),
+            deviceIterator = usbDeviceList.values().iterator();
+
+        while (deviceIterator.hasNext()) {
+            let usbDevice = deviceIterator.next();
+            if (IBScan.isScanDevice(usbDevice)) {
+                let deviceId = usbDevice.getDeviceId();
+                deviceList.push({
+                    deviceId: deviceId,
+                    hasPermission: me.hasPermission(deviceId)
+                });
+            }
+        }
+
+        return deviceList;
+    }
+
+    getDeviceCount(): Promise<number> {
+        return new Promise((resolve, reject) => {
+            try {
+                resolve(this.getInstance().getDeviceCount());
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    hasPermission(deviceId: number): boolean {
+        return this.getInstance().hasPermission(deviceId);
+    }
+
+    requestPermission(deviceId: number) {
+        this.getInstance().requestPermission(deviceId);
+    }
+
+    getDeviceDescription(deviceIndex: number): Promise<IBScan.DeviceDesc> {
+        return new Promise((resolve, reject) => {
+            try {
+                resolve(this.getInstance().getDeviceDescription(deviceIndex));
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    openDevice(deviceIndex: number): Promise<IBScanDevice> {
+        return new Promise((resolve, reject) => {
+            try {
+                resolve(this.getInstance().openDevice(deviceIndex));
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    openDeviceAsync(deviceIndex: number): Promise<any> {
+        return new Promise((resolve, reject) => {
+            try {
+                this.getInstance().openDeviceAsync(deviceIndex);
+                resolve();
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    closeDevice(): Promise<any> {
+        return new Promise((resolve, reject) => {
+            try {
+                this.ibScanDevice.close();
+                this.ibScanDevice = null;
+                resolve();
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    getLEDs(): Promise<number> {
+        return new Promise((resolve, reject) => {
+            try {
+                resolve(this.ibScanDevice.getLEDs());
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    setLEDs(value: number): Promise<any> {
+        return new Promise((resolve, reject) => {
+            try {
+                this.ibScanDevice.setLEDs(value);
+                resolve();
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    isCaptureActive(): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            try {
+                resolve(this.ibScanDevice.isCaptureActive());
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    isCaptureAvailable(
+        imageType: ImageType = ImageType.FLAT_SINGLE_FINGER,
+        imageResolution: ImageResolution = ImageResolution.RESOLUTION_500
+    ): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            try {
+                resolve(this.ibScanDevice.isCaptureAvailable(imageType, imageResolution));
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    beginCapture(
+        imageType: ImageType = ImageType.FLAT_SINGLE_FINGER,
+        imageResolution: ImageResolution = ImageResolution.RESOLUTION_500,
+        captureOptions: number = IBScanDevice.OPTION_AUTO_CAPTURE | IBScanDevice.OPTION_AUTO_CONTRAST
+    ): Promise<any> {
+        return new Promise((resolve, reject) => {
+            try {
+
+                this.bitmapImage = this.toDrawBitmap(
+                    Integer.parseInt(this.ibScanDevice.getProperty(IBScanDevice.PropertyId.IMAGE_WIDTH)),
+                    Integer.parseInt(this.ibScanDevice.getProperty(IBScanDevice.PropertyId.IMAGE_HEIGHT))
+                );
+
+                this.ibScanDevice
+                    .beginCaptureImage(imageType, imageResolution, captureOptions);
+
+                this.ibScanDevice
+                    .setScanDeviceListener(this);
+
+                resolve();
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    cancelCapture(): Promise<any> {
+        return new Promise((resolve, reject) => {
+            try {
+                this.ibScanDevice
+                    .cancelCaptureImage();
+                resolve();
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    isFingerTouching(): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            try {
+                resolve(this.ibScanDevice.isFingerTouching());
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    createImageSource(imageData: ImageData): Promise<imageSource.ImageSource> {
+        return new Promise((resolve, reject) => {
+            try {
+                this.ibScanDevice.createBmpEx(imageData.buffer, this.bitmapImage)
+                resolve(imageSource.fromNativeSource(this.bitmapImage));
+            } catch (exception) {
+                reject(exception);
+            }
+        });
+    }
+
+    private toDrawBitmap(width: number, height: number): Bitmap {
+        let bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        if (bitmap != null) {
+            let imageBuffer = (<any>Array).create("byte", width * height * 4);
+            for (let y: number = 0; y < height; y++) {
+                for (let x: number = 0; x < width; x++) {
+                    imageBuffer[(y * width + x) * 4] =
+                        imageBuffer[(y * width + x) * 4 + 1] =
+                        imageBuffer[(y * width + x) * 4 + 2] = 128;
+                    imageBuffer[(y * width + x) * 4 + 3] = 255;
+                }
+            }
+            bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(imageBuffer));
+        }
+        return bitmap;
     }
 
     scanDeviceAttached(deviceId: number) {
         let me = this;
 
         if (_.isFunction(me.scanDeviceAttachedCallback)) {
-            me.scanDeviceAttachedCallback(deviceId);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.scanDeviceAttachedCallback(deviceId);
+                    }
+                }))
         }
     }
 
@@ -105,7 +336,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.scanDeviceDetachedCallback)) {
-            me.scanDeviceDetachedCallback(deviceId);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.scanDeviceDetachedCallback(deviceId)
+                    }
+                }));
         }
     }
 
@@ -113,7 +349,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.scanDevicePermissionGrantedCallback)) {
-            me.scanDevicePermissionGrantedCallback(deviceId, granted);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.scanDevicePermissionGrantedCallback(deviceId, granted);
+                    }
+                }));
         }
     }
 
@@ -121,7 +362,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.scanDeviceCountChangedCallback)) {
-            me.scanDeviceCountChangedCallback(deviceCount);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.scanDeviceCountChangedCallback(deviceCount);
+                    }
+                }));
         }
     }
 
@@ -129,7 +375,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.scanDeviceInitProgressCallback)) {
-            me.scanDeviceInitProgressCallback(deviceIndex, progressValue);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.scanDeviceInitProgressCallback(deviceIndex, progressValue);
+                    }
+                }));
         }
     }
 
@@ -140,8 +391,14 @@ export class IbScan extends java.lang.Object implements
     ) {
         let me = this;
 
+        me.ibScanDevice = device;
         if (_.isFunction(me.scanDeviceOpenCompleteCallback)) {
-            me.scanDeviceOpenCompleteCallback(deviceIndex, device, exception);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.scanDeviceOpenCompleteCallback(deviceIndex, device, exception);
+                    }
+                }));
         }
     }
 
@@ -149,7 +406,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.deviceCommunicationBrokenCallback)) {
-            me.deviceCommunicationBrokenCallback(device);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.deviceCommunicationBrokenCallback(device);
+                    }
+                }));
         }
     }
 
@@ -160,7 +422,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.deviceImagePreviewAvailableCallback)) {
-            me.deviceImagePreviewAvailableCallback(device, image);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.deviceImagePreviewAvailableCallback(device, image);
+                    }
+                }));
         }
     }
 
@@ -171,18 +438,28 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.deviceFingerCountChangedCallback)) {
-            me.deviceFingerCountChangedCallback(device, fingerState);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.deviceFingerCountChangedCallback(device, fingerState);
+                    }
+                }));
         }
     }
 
     deviceFingerQualityChanged(
         device: IBScanDevice,
-        fingerQualities: FingerQualityState[]
+        fingerQualities: Array<FingerQualityState>
     ) {
         let me = this;
 
         if (_.isFunction(me.deviceFingerQualityChangedCallback)) {
-            me.deviceFingerQualityChangedCallback(device, fingerQualities);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.deviceFingerQualityChangedCallback(device, fingerQualities);
+                    }
+                }));
         }
     }
 
@@ -193,7 +470,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.deviceAcquisitionBegunCallback)) {
-            me.deviceAcquisitionBegunCallback(device, imageType);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.deviceAcquisitionBegunCallback(device, imageType);
+                    }
+                }));
         }
     }
 
@@ -204,7 +486,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.deviceAcquisitionCompletedCallback)) {
-            me.deviceAcquisitionCompletedCallback(device, imageType);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.deviceAcquisitionCompletedCallback(device, imageType);
+                    }
+                }));
         }
     }
 
@@ -212,12 +499,17 @@ export class IbScan extends java.lang.Object implements
         device: IBScanDevice,
         image: ImageData,
         imageType: ImageType,
-        splitImageArray: ImageData[]
+        splitImageArray: Array<ImageData>
     ) {
         let me = this;
 
         if (_.isFunction(me.deviceImageResultAvailableCallback)) {
-            me.deviceImageResultAvailableCallback(device, image, imageType, splitImageArray);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.deviceImageResultAvailableCallback(device, image, imageType, splitImageArray);
+                    }
+                }));
         }
     }
 
@@ -227,21 +519,26 @@ export class IbScan extends java.lang.Object implements
         image: ImageData,
         imageType: ImageType,
         detectedFingerCount: number,
-        segmentImageArray: ImageData[],
-        segmentPositionArray: SegmentPosition[]
+        segmentImageArray: Array<ImageData>,
+        segmentPositionArray: Array<SegmentPosition>
     ) {
         let me = this;
 
         if (_.isFunction(me.deviceImageResultExtendedAvailableCallback)) {
-            me.deviceImageResultExtendedAvailableCallback(
-                device,
-                imageStatus,
-                image,
-                imageType,
-                detectedFingerCount,
-                segmentImageArray,
-                segmentPositionArray
-            );
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.deviceImageResultExtendedAvailableCallback(
+                            device,
+                            imageStatus,
+                            image,
+                            imageType,
+                            detectedFingerCount,
+                            segmentImageArray,
+                            segmentPositionArray
+                        );
+                    }
+                }));
         }
     }
 
@@ -252,7 +549,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.devicePlatenStateChangedCallback)) {
-            me.devicePlatenStateChangedCallback(device, platenState);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.devicePlatenStateChangedCallback(device, platenState);
+                    }
+                }));
         }
     }
 
@@ -263,7 +565,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.deviceWarningReceivedCallback)) {
-            me.deviceWarningReceivedCallback(device, warning);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.deviceWarningReceivedCallback(device, warning);
+                    }
+                }));
         }
     }
 
@@ -274,7 +581,12 @@ export class IbScan extends java.lang.Object implements
         let me = this;
 
         if (_.isFunction(me.devicePressedKeyButtonsCallback)) {
-            me.devicePressedKeyButtonsCallback(device, pressedKeyButtons);
+            application.android.foregroundActivity
+                .runOnUiThread(new Runnable({
+                    run() {
+                        me.devicePressedKeyButtonsCallback(device, pressedKeyButtons);
+                    }
+                }));
         }
     }
 }

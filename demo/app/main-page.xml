@@ -1,6 +1,18 @@
-<Page xmlns="http://schemas.nativescript.org/tns.xsd" loaded="pageLoaded" class="page"
+<Page 
+  xmlns="http://schemas.nativescript.org/tns.xsd" loaded="pageLoaded" class="page" 
   xmlns:ui="nativescript-ib-scan">
-  <StackLayout class="p-20">
-    <Label text="{{ message }}" class="t-20 text-center c-black" textWrap="true"/>
-  </StackLayout>
+  <ScrollView>
+    <StackLayout class="p-20">
+      <Label text="{{ status }}" class="m-t-20 text-center c-black" textWrap="true"/>
+      <Button text="Get device list" tap="{{ getDeviceList }}" class="m-t-20 btn btn-primary"/>
+      <Button text="Request permission" tap="{{ requestPermission }}" class="m-t-20 btn btn-primary"/>
+      <Button text="Get device description" tap="{{ getDeviceDescription }}" class="m-t-20 btn btn-primary"/>
+      <Button text="Open device" tap="{{ openDevice }}" class="m-t-20 btn btn-primary"/>
+      <Button text="Set LEDs" tap="{{ setLEDs }}" class="m-t-20 btn btn-primary"/>
+      <Button text="Begin capture" tap="{{ beginCapture }}" class="m-t-20 btn btn-primary"/>
+      <Button text="Cancel capture" tap="{{ cancelCapture }}" class="m-t-20 btn btn-primary"/>
+      <Button text="Close device" tap="{{ closeDevice }}" class="m-t-20 btn btn-primary"/>
+      <Image src="{{ imageSource }}" class="m-t-20"/>
+    </StackLayout>
+  </ScrollView>
 </Page>
